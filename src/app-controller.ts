@@ -1,9 +1,8 @@
 import { attachStreamToVideo, isCameraSupported, startRearCamera, stopStream } from './services/camera';
-import { captureRegionBlob, captureRegionCanvas } from './services/crop';
+import { captureFrameCanvas } from './services/crop';
 import { saveCropBlob, clearCropBlobs, deleteCropBlob, isIndexedDbSupported, getCropBlob } from './services/indexeddb';
 import {
   compareRecognitionText,
-  normalizeTextForComparison,
   parseKeywordsInput,
 } from './services/text-compare';
 import { AlertAudioService } from './services/audio';
@@ -19,11 +18,9 @@ import {
   updateHistoryRecord,
 } from './services/history-store';
 import { loadOcrWorker, recognizeCanvas, terminateOcrWorker } from './services/ocr';
-import { clampRegion } from './services/region';
 import { DEFAULT_SETTINGS, createInitialRuntimeState } from './state/defaults';
 import { transitionRuntimeState, type RuntimeEvent } from './state/machine';
 import { formatDateKey, formatDateTimeDisplay, formatDurationMs, formatTimeKey, toIsoString } from './utils/time';
-import { renderRegionBox, setupRegionEditor } from './ui/region-editor';
 import type {
   AppMode,
   AppSettings,
@@ -33,7 +30,6 @@ import type {
   HistoryRecord,
   KeywordMode,
   PauseReason,
-  RegionRect,
   RuntimeState,
 } from './types';
 
@@ -41,28 +37,31 @@ const ALERT_RECOVERY_MS = 2500;
 
 const HERO_VISIBLE_MODES = new Set<AppMode>(['idle', 'camera-stopped', 'error']);
 const STATUS_VISIBLE_MODES = new Set<AppMode>([
-  'requesting-permission',
-  'preparing-camera',
-  'camera-ready',
-  'loading-ocr',
   'monitoring',
   'analyzing',
   'candidate-detected',
   'waiting-for-clear',
   'paused',
-  'camera-stopped',
-  'error',
 ]);
 const CAMERA_PANEL_MODES = new Set<AppMode>([
   'preparing-camera',
   'camera-ready',
   'loading-ocr',
+  'ready-to-monitor',
   'monitoring',
   'analyzing',
   'candidate-detected',
   'waiting-for-clear',
   'paused',
 ]);
+const PRE_MONITORING_MODES = new Set<AppMode>([
+  'requesting-permission',
+  'preparing-camera',
+  'camera-ready',
+  'loading-ocr',
+  'ready-to-monitor',
+]);
+const MONITORING_CONTROL_MODES = new Set<AppMode>(['monitoring', 'analyzing', 'candidate-detected', 'waiting-for-clear', 'paused']);
 const ANALYZABLE_MODES = new Set<AppMode>(['monitoring', 'candidate-detected', 'waiting-for-clear']);
 
 interface AppState {
@@ -72,6 +71,10 @@ interface AppState {
   banner: BannerMessage | null;
   historyOpen: boolean;
   historyFilterDate: string;
+  preflightChecks: {
+    previewTested: boolean;
+    alertTested: boolean;
+  };
 }
 
 interface AppElements {
@@ -93,15 +96,17 @@ interface AppElements {
   cameraResolutionText: HTMLElement;
   videoFrame: HTMLElement;
   cameraVideo: HTMLVideoElement;
-  regionOverlay: HTMLElement;
-  regionBox: HTMLElement;
-  regionResizeHandle: HTMLElement;
   capturePreviewButton: HTMLButtonElement;
+  startMonitoringButton: HTMLButtonElement;
+  monitoringActions: HTMLElement;
   pauseButton: HTMLButtonElement;
   resumeButton: HTMLButtonElement;
   stopCameraButton: HTMLButtonElement;
   historyToggleButton: HTMLButtonElement;
   previewCanvas: HTMLCanvasElement;
+  preflightPanel: HTMLElement;
+  preflightPreviewTag: HTMLElement;
+  preflightAlertTag: HTMLElement;
   settingsPanel: HTMLElement;
   expectedTextInput: HTMLInputElement;
   keywordsInput: HTMLTextAreaElement;
@@ -140,7 +145,6 @@ export class AppController {
   private readonly previewContext: CanvasRenderingContext2D;
   private stream: MediaStream | null = null;
   private cameraCleanup: (() => void) | null = null;
-  private regionEditorCleanup: (() => void) | null = null;
   private analysisTimerId: number | null = null;
   private analysisGeneration = 0;
   private startupGeneration = 0;
@@ -166,6 +170,10 @@ export class AppController {
       banner: null,
       historyOpen: false,
       historyFilterDate: '',
+      preflightChecks: {
+        previewTested: false,
+        alertTested: false,
+      },
     };
 
     if (this.state.settings.saveCropImages && !isIndexedDbSupported()) {
@@ -179,7 +187,6 @@ export class AppController {
 
     this.applyCompatibilityChecks();
     this.bindEvents();
-    this.attachRegionEditor();
   }
 
   async start(): Promise<void> {
@@ -206,15 +213,17 @@ export class AppController {
       cameraResolutionText: this.getElement(root, '#camera-resolution-text'),
       videoFrame: this.getElement(root, '#video-frame'),
       cameraVideo: this.getElement(root, '#camera-video'),
-      regionOverlay: this.getElement(root, '#region-overlay'),
-      regionBox: this.getElement(root, '#region-box'),
-      regionResizeHandle: this.getElement(root, '#region-resize-handle'),
       capturePreviewButton: this.getElement(root, '#capture-preview-button'),
+      startMonitoringButton: this.getElement(root, '#start-monitoring-button'),
+      monitoringActions: this.getElement(root, '#monitoring-actions'),
       pauseButton: this.getElement(root, '#pause-button'),
       resumeButton: this.getElement(root, '#resume-button'),
       stopCameraButton: this.getElement(root, '#stop-camera-button'),
       historyToggleButton: this.getElement(root, '#history-toggle-button'),
       previewCanvas: this.getElement(root, '#preview-canvas'),
+      preflightPanel: this.getElement(root, '#preflight-panel'),
+      preflightPreviewTag: this.getElement(root, '#preflight-preview-tag'),
+      preflightAlertTag: this.getElement(root, '#preflight-alert-tag'),
       settingsPanel: this.getElement(root, '#settings-panel'),
       expectedTextInput: this.getElement(root, '#expected-text-input'),
       keywordsInput: this.getElement(root, '#keywords-input'),
@@ -269,6 +278,10 @@ export class AppController {
 
     this.elements.capturePreviewButton.addEventListener('click', () => {
       void this.capturePreview();
+    });
+
+    this.elements.startMonitoringButton.addEventListener('click', () => {
+      void this.startMonitoring();
     });
 
     this.elements.pauseButton.addEventListener('click', () => {
@@ -376,19 +389,6 @@ export class AppController {
     });
   }
 
-  private attachRegionEditor(): void {
-    this.regionEditorCleanup?.();
-    this.regionEditorCleanup = setupRegionEditor({
-      overlay: this.elements.regionOverlay,
-      box: this.elements.regionBox,
-      handle: this.elements.regionResizeHandle,
-      getRegion: () => this.state.settings.region,
-      onChange: (region) => {
-        this.applySettingsPatch({ region: clampRegion(region) });
-      },
-    });
-  }
-
   private applyCompatibilityChecks(): void {
     this.canPrepare = window.isSecureContext && isCameraSupported();
 
@@ -417,6 +417,7 @@ export class AppController {
 
   private applySettingsPatch(patch: Partial<AppSettings>): void {
     this.state.settings = updateSettings(this.state.settings, patch);
+    this.resetPreflightChecks();
 
     if (this.state.settings.saveCropImages && !isIndexedDbSupported()) {
       this.state.settings = updateSettings(this.state.settings, { saveCropImages: false });
@@ -448,6 +449,19 @@ export class AppController {
     }
   }
 
+  private resetPreflightChecks(): void {
+    this.state.preflightChecks.previewTested = false;
+    this.state.preflightChecks.alertTested = false;
+  }
+
+  private hasCompletedPreflightChecks(): boolean {
+    return this.state.preflightChecks.previewTested && this.state.preflightChecks.alertTested;
+  }
+
+  private canStartMonitoring(): boolean {
+    return this.state.runtime.mode === 'ready-to-monitor' && this.stream !== null && this.hasCompletedPreflightChecks();
+  }
+
   private updateRuntime(event: RuntimeEvent): RuntimeState {
     this.state.runtime = transitionRuntimeState(this.state.runtime, event);
     return this.state.runtime;
@@ -462,14 +476,15 @@ export class AppController {
     this.elements.bannerPanel.hidden = !this.state.banner;
     this.elements.statusPanel.hidden = !STATUS_VISIBLE_MODES.has(mode);
     this.elements.cameraPanel.hidden = !CAMERA_PANEL_MODES.has(mode);
-    this.elements.settingsPanel.hidden = !CAMERA_PANEL_MODES.has(mode);
+    this.elements.preflightPanel.hidden = mode !== 'ready-to-monitor';
+    this.elements.settingsPanel.hidden = !HERO_VISIBLE_MODES.has(mode);
     this.elements.alertShell.hidden = mode !== 'alerting';
     this.elements.historyPanel.hidden = !this.state.historyOpen || mode === 'alerting';
 
     this.elements.bannerPanel.dataset.tone = this.state.banner?.tone ?? '';
     this.elements.bannerMessage.textContent = this.state.banner?.message ?? '';
 
-    this.elements.prepareButton.textContent = mode === 'error' ? 'Tentar novamente' : 'Preparar monitoramento';
+    this.elements.prepareButton.textContent = mode === 'error' ? 'Tentar novamente' : 'Preparar câmera';
     this.elements.prepareButton.disabled = !this.canPrepare || mode === 'requesting-permission' || mode === 'preparing-camera' || mode === 'loading-ocr';
 
     const historyButtonLabel = this.state.historyOpen ? 'Fechar histórico' : 'Histórico';
@@ -485,20 +500,29 @@ export class AppController {
     this.elements.clearCountText.textContent = `${this.state.runtime.clearCount}/${this.state.settings.clearConfirmations}`;
 
     this.elements.cameraResolutionText.textContent = this.describeCameraResolution();
-    this.elements.pauseButton.hidden = !this.isCameraVisibleMode(mode) || mode === 'paused';
+    this.elements.capturePreviewButton.hidden = mode !== 'ready-to-monitor';
+    this.elements.testAlertButton.hidden = mode !== 'ready-to-monitor';
+    this.elements.startMonitoringButton.hidden = mode !== 'ready-to-monitor';
+    this.elements.startMonitoringButton.disabled = !this.canStartMonitoring();
+    this.elements.monitoringActions.hidden = !MONITORING_CONTROL_MODES.has(mode);
+    this.elements.preflightPreviewTag.dataset.state = this.state.preflightChecks.previewTested ? 'done' : 'pending';
+    this.elements.preflightPreviewTag.textContent = this.state.preflightChecks.previewTested ? 'Leitura OK' : 'Leitura pendente';
+    this.elements.preflightAlertTag.dataset.state = this.state.preflightChecks.alertTested ? 'done' : 'pending';
+    this.elements.preflightAlertTag.textContent = this.state.preflightChecks.alertTested ? 'Alarme OK' : 'Alarme pendente';
+    this.elements.pauseButton.hidden = !MONITORING_CONTROL_MODES.has(mode) || mode === 'paused';
     this.elements.resumeButton.hidden = mode !== 'paused';
-    this.elements.stopCameraButton.hidden = !this.isCameraVisibleMode(mode);
-    this.elements.capturePreviewButton.disabled = !this.stream || mode === 'alerting';
-    this.elements.testAlertButton.disabled = mode === 'requesting-permission' || mode === 'preparing-camera' || mode === 'loading-ocr';
+    this.elements.stopCameraButton.hidden = !MONITORING_CONTROL_MODES.has(mode);
+    this.elements.historyToggleButton.hidden = !MONITORING_CONTROL_MODES.has(mode);
     this.elements.stopTestAlertButton.hidden = !this.testAlertActive;
 
     this.syncSettingsForm();
-    this.syncRegionOverlay();
     this.syncAlertPanel();
     this.syncHistoryPanel();
 
     const noteParts = [
-      'A câmera traseira observa a tela e tudo acontece no aparelho.',
+      mode === 'ready-to-monitor'
+        ? 'Faça os dois testes abaixo antes de iniciar.'
+        : 'A câmera traseira observa a tela inteira e tudo acontece no aparelho.',
       this.canPrepare ? 'Mantenha a tela ligada durante o uso.' : 'Abra a página em conexão segura para usar a câmera.',
     ];
     this.elements.compatibilityNote.textContent = noteParts.join(' ');
@@ -533,10 +557,6 @@ export class AppController {
     if (this.state.historyFilterDate !== this.elements.historyDateFilter.value) {
       this.elements.historyDateFilter.value = this.state.historyFilterDate;
     }
-  }
-
-  private syncRegionOverlay(): void {
-    renderRegionBox(this.elements.regionBox, this.state.settings.region);
   }
 
   private syncAlertPanel(): void {
@@ -593,9 +613,9 @@ export class AppController {
     this.startupGeneration += 1;
     const generation = this.startupGeneration;
 
-    this.stopTestAlert();
-    this.vibration.stop();
     this.audio.stopTone();
+    this.testAlertActive = false;
+    this.vibration.stop();
     await this.wakeLock.release();
 
     this.stopCameraResources();
@@ -654,13 +674,11 @@ export class AppController {
         return;
       }
 
-      this.updateRuntime({
-        type: 'ocr-ready',
-        now: Date.now(),
-        analysisIntervalMs: this.state.settings.analysisIntervalMs,
-      });
+      this.resetPreflightChecks();
+      this.state.historyOpen = false;
+      this.updateRuntime({ type: 'ocr-ready' });
       this.render();
-      this.syncAnalysisLoop();
+      this.setBanner('Faça a leitura e o alarme de teste antes de iniciar.', 'info', 4000);
     } catch (error) {
       if (generation !== this.startupGeneration) {
         return;
@@ -668,6 +686,34 @@ export class AppController {
 
       this.handleFatalError(describeSetupError(error));
     }
+  }
+
+  private async startMonitoring(): Promise<void> {
+    if (!this.canStartMonitoring()) {
+      this.setBanner('Faça os testes de leitura e alarme antes de iniciar.', 'warning');
+      return;
+    }
+
+    this.clearBanner();
+    this.audio.stopTone();
+    this.testAlertActive = false;
+    this.vibration.stop();
+    this.cancelAnalysisLoop();
+
+    const wakeLockResult = await this.wakeLock.request();
+    if (!wakeLockResult.supported) {
+      this.setBanner('A tela pode desligar sozinha.', 'warning');
+    } else if (!wakeLockResult.ok) {
+      this.setBanner('Não foi possível manter a tela ligada.', 'warning');
+    }
+
+    this.updateRuntime({
+      type: 'monitoring-started',
+      now: Date.now(),
+      analysisIntervalMs: this.state.settings.analysisIntervalMs,
+    });
+    this.render();
+    this.syncAnalysisLoop();
   }
 
   private async runAnalysisCycle(): Promise<void> {
@@ -682,7 +728,7 @@ export class AppController {
     this.render();
 
     try {
-      const captureCanvas = captureRegionCanvas(this.elements.cameraVideo, this.state.settings.region, this.state.settings.preprocess);
+      const captureCanvas = captureFrameCanvas(this.elements.cameraVideo, this.state.settings.preprocess);
       const recognizedText = await recognizeCanvas(captureCanvas);
 
       if (generation !== this.analysisGeneration) {
@@ -916,6 +962,7 @@ export class AppController {
     this.cameraResolutionText('Câmera encerrada.');
     this.elements.videoFrame.style.aspectRatio = '4 / 3';
     this.cameraStopRequested = true;
+    this.resetPreflightChecks();
   }
 
   private attachStreamListeners(stream: MediaStream): void {
@@ -994,8 +1041,8 @@ export class AppController {
 
   private async handleAnalysisFailure(error: unknown): Promise<void> {
     const message = error instanceof Error && error.message.includes('video-not-ready')
-      ? 'A região de captura ainda não está pronta.'
-      : 'Não foi possível ler a área. O monitoramento será encerrado.';
+      ? 'A câmera ainda não está pronta.'
+      : 'Não foi possível ler a imagem da câmera. O monitoramento será encerrado.';
 
     await this.handleFatalError(message);
   }
@@ -1008,6 +1055,7 @@ export class AppController {
     try {
       await this.audio.playTestTone();
       this.testAlertActive = true;
+      this.state.preflightChecks.alertTested = true;
       this.setBanner('Teste de alerta tocando. Toque em "Parar teste" quando quiser.', 'info');
       this.render();
     } catch {
@@ -1033,13 +1081,14 @@ export class AppController {
     }
 
     try {
-      const canvas = captureRegionCanvas(this.elements.cameraVideo, this.state.settings.region, this.state.settings.preprocess);
+      const canvas = captureFrameCanvas(this.elements.cameraVideo, this.state.settings.preprocess);
       this.previewCanvasResize(canvas.width, canvas.height);
       this.previewContext.clearRect(0, 0, this.elements.previewCanvas.width, this.elements.previewCanvas.height);
       this.previewContext.drawImage(canvas, 0, 0);
-      this.setBanner('Área atualizada.', 'info', 2500);
+      this.state.preflightChecks.previewTested = true;
+      this.setBanner('Prévia atualizada.', 'info', 2500);
     } catch {
-      this.setBanner('Não foi possível testar a área.', 'warning');
+      this.setBanner('Não foi possível testar a imagem da câmera.', 'warning');
     }
   }
 
@@ -1077,6 +1126,11 @@ export class AppController {
 
   private async handleVisibilityChange(): Promise<void> {
     if (document.hidden) {
+      if (PRE_MONITORING_MODES.has(this.state.runtime.mode)) {
+        await this.stopCamera();
+        return;
+      }
+
       if (this.isSessionActive()) {
         await this.pauseMonitoring('background');
       }
@@ -1135,12 +1189,24 @@ export class AppController {
       return 'Câmera encerrada.';
     }
 
+    if (this.state.runtime.mode === 'ready-to-monitor') {
+      return this.cameraResolution ? `Câmera pronta • ${this.cameraResolution.width}×${this.cameraResolution.height}` : 'Pronta para iniciar.';
+    }
+
     if (this.state.runtime.mode === 'requesting-permission') {
       return 'Pedindo acesso à câmera...';
     }
 
     if (this.state.runtime.mode === 'preparing-camera') {
       return 'Preparando a câmera...';
+    }
+
+    if (this.state.runtime.mode === 'camera-ready') {
+      return this.cameraResolution ? `Câmera pronta • ${this.cameraResolution.width}×${this.cameraResolution.height}` : 'Câmera pronta.';
+    }
+
+    if (this.state.runtime.mode === 'loading-ocr') {
+      return 'Carregando a leitura...';
     }
 
     if (this.cameraResolution) {
@@ -1264,7 +1330,7 @@ export class AppController {
 
     const imageSlot = document.createElement('div');
     if (record.cropId) {
-      imageSlot.textContent = 'Carregando recorte salvo...';
+      imageSlot.textContent = 'Carregando imagem salva...';
       details.addEventListener('toggle', () => {
         if (details.open) {
           void this.loadHistoryCropPreview(record, imageSlot);
@@ -1272,7 +1338,7 @@ export class AppController {
       });
     } else {
       imageSlot.className = 'helper-text';
-      imageSlot.textContent = 'Nenhum recorte salvo para este registro.';
+      imageSlot.textContent = 'Nenhuma imagem salva para este registro.';
     }
 
     const actions = document.createElement('div');
@@ -1312,7 +1378,7 @@ export class AppController {
     try {
       const blob = await getCropBlob(record.cropId);
       if (!blob) {
-        imageSlot.textContent = 'Recorte não encontrado.';
+        imageSlot.textContent = 'Imagem não encontrada.';
         return;
       }
 
@@ -1321,11 +1387,11 @@ export class AppController {
 
       const image = document.createElement('img');
       image.className = 'history-image';
-      image.alt = 'Recorte salvo da notificação detectada';
+      image.alt = 'Imagem salva da notificação detectada';
       image.src = url;
       imageSlot.replaceChildren(image);
     } catch {
-      imageSlot.textContent = 'Não foi possível carregar o recorte salvo.';
+      imageSlot.textContent = 'Não foi possível carregar a imagem salva.';
     }
   }
 
@@ -1416,6 +1482,8 @@ function modeLabel(mode: AppMode): string {
       return 'Câmera pronta';
     case 'loading-ocr':
       return 'Carregando leitura';
+    case 'ready-to-monitor':
+      return 'Pré-teste';
     case 'monitoring':
       return 'Monitorando';
     case 'analyzing':

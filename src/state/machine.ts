@@ -6,7 +6,8 @@ export type RuntimeEvent =
   | { type: 'camera-started' }
   | { type: 'camera-ready' }
   | { type: 'ocr-loading' }
-  | { type: 'ocr-ready'; now: number; analysisIntervalMs: number }
+  | { type: 'ocr-ready' }
+  | { type: 'monitoring-started'; now: number; analysisIntervalMs: number }
   | { type: 'analysis-started' }
   | {
       type: 'analysis-result';
@@ -65,6 +66,16 @@ export function transitionRuntimeState(state: RuntimeState, event: RuntimeEvent)
     case 'ocr-ready':
       return {
         ...state,
+        mode: 'ready-to-monitor',
+        statusText: 'Faça os testes e inicie o monitoramento.',
+        analysisResumeAt: null,
+        originMode: null,
+        confirmationCount: 0,
+        clearCount: 0,
+      };
+    case 'monitoring-started':
+      return {
+        ...state,
         mode: 'monitoring',
         statusText: 'Monitorando.',
         analysisResumeAt: event.now + Math.max(0, event.analysisIntervalMs),
@@ -80,7 +91,7 @@ export function transitionRuntimeState(state: RuntimeState, event: RuntimeEvent)
       return {
         ...state,
         mode: 'analyzing',
-        statusText: 'Analisando região selecionada...',
+        statusText: 'Lendo a imagem inteira da câmera...',
         originMode: state.mode,
         analysisResumeAt: null,
       };

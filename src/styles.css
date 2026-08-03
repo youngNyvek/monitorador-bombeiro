@@ -36,10 +36,6 @@ body {
   color: var(--text);
 }
 
-body.region-interacting {
-  user-select: none;
-}
-
 body[data-mode='alerting'] {
   background: #020617;
 }
@@ -233,6 +229,80 @@ button.big-action {
   flex: 1;
 }
 
+.status-title {
+  margin: 0.1rem 0 0;
+  font-size: 1rem;
+  font-weight: 800;
+  color: var(--text);
+}
+
+.status-summary {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  cursor: pointer;
+  list-style: none;
+}
+
+.status-summary::-webkit-details-marker {
+  display: none;
+}
+
+.status-summary-main {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.8rem;
+}
+
+.status-summary-hint {
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.status-body {
+  margin-top: 1rem;
+}
+
+.status-panel {
+  padding-top: 0.95rem;
+}
+
+.preflight-checklist {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.85rem;
+}
+
+.preflight-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+  margin-top: 0.9rem;
+}
+
+.preflight-stop {
+  width: 100%;
+  margin-top: 0.75rem;
+}
+
+.preflight-card .preview-card {
+  margin-top: 0.95rem;
+}
+
+.tag[data-state='done'] {
+  background: rgba(34, 197, 94, 0.16);
+  color: #bbf7d0;
+}
+
+.tag[data-state='pending'] {
+  background: rgba(148, 163, 184, 0.14);
+  color: #cbd5e1;
+}
+
 .status-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -302,52 +372,6 @@ button.big-action {
   width: 100%;
   height: auto;
   background: #020617;
-}
-
-.region-layer {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-}
-
-.region-box {
-  position: absolute;
-  min-width: 8%;
-  min-height: 8%;
-  border: 2px solid rgba(125, 211, 252, 0.96);
-  border-radius: 18px;
-  background: rgba(14, 165, 233, 0.12);
-  box-shadow: 0 0 0 9999px rgba(2, 6, 23, 0.22);
-  pointer-events: auto;
-  touch-action: none;
-  cursor: move;
-  overflow: hidden;
-}
-
-.region-label {
-  position: absolute;
-  left: 0.6rem;
-  top: 0.55rem;
-  padding: 0.28rem 0.5rem;
-  border-radius: 999px;
-  background: rgba(2, 6, 23, 0.72);
-  color: #e0f2fe;
-  font-size: 0.72rem;
-  font-weight: 800;
-}
-
-.region-handle {
-  position: absolute;
-  right: 0.15rem;
-  bottom: 0.15rem;
-  width: 1.45rem;
-  height: 1.45rem;
-  min-height: 0;
-  border-radius: 999px;
-  border: 2px solid #fff;
-  background: var(--accent);
-  cursor: nwse-resize;
-  padding: 0;
 }
 
 .panel-subsection {
@@ -597,14 +621,16 @@ button.big-action {
 
   .hero-panel,
   .banner-panel,
+  .camera-panel,
   .status-panel,
+  .settings-panel,
   .history-panel {
     grid-column: 1 / -1;
   }
 
   .camera-panel,
+  .status-panel,
   .settings-panel {
-    grid-column: span 1;
     align-self: start;
   }
 

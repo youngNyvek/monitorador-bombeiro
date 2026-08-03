@@ -6,6 +6,7 @@ export type AppMode =
   | 'preparing-camera'
   | 'camera-ready'
   | 'loading-ocr'
+  | 'ready-to-monitor'
   | 'monitoring'
   | 'analyzing'
   | 'candidate-detected'

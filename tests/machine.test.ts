@@ -8,7 +8,8 @@ function buildMonitoringState() {
   state = transitionRuntimeState(state, { type: 'camera-started' });
   state = transitionRuntimeState(state, { type: 'camera-ready' });
   state = transitionRuntimeState(state, { type: 'ocr-loading' });
-  state = transitionRuntimeState(state, { type: 'ocr-ready', now: 1000, analysisIntervalMs: 2000 });
+  state = transitionRuntimeState(state, { type: 'ocr-ready' });
+  state = transitionRuntimeState(state, { type: 'monitoring-started', now: 1000, analysisIntervalMs: 2000 });
   return state;
 }
 
@@ -101,6 +102,22 @@ describe('runtime state machine', () => {
     expect(state.alertStartedAt).toBeNull();
     expect(state.alertStoppedAt).toBeNull();
     expect(state.alertDurationMs).toBeNull();
+  });
+
+  it('requires a separate start step after OCR is ready', () => {
+    let state = createInitialRuntimeState();
+    state = transitionRuntimeState(state, { type: 'prepare-requested' });
+    state = transitionRuntimeState(state, { type: 'camera-started' });
+    state = transitionRuntimeState(state, { type: 'camera-ready' });
+    state = transitionRuntimeState(state, { type: 'ocr-loading' });
+    state = transitionRuntimeState(state, { type: 'ocr-ready' });
+
+    expect(state.mode).toBe('ready-to-monitor');
+    expect(state.analysisResumeAt).toBeNull();
+
+    state = transitionRuntimeState(state, { type: 'monitoring-started', now: 1000, analysisIntervalMs: 2000 });
+    expect(state.mode).toBe('monitoring');
+    expect(state.analysisResumeAt).toBe(3000);
   });
 
   it('keeps a minimum interval before new alerts', () => {

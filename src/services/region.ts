@@ -16,10 +16,10 @@ export function clampRegion(region: RegionRect, minSize = 5): RegionRect {
 
 export function createDefaultRegion(): RegionRect {
   return clampRegion({
-    x: 56,
-    y: 56,
-    width: 32,
-    height: 22,
+    x: 0,
+    y: 0,
+    width: 100,
+    height: 100,
   });
 }
 
