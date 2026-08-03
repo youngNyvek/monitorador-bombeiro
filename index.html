@@ -1,0 +1,232 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#0f172a" />
+    <meta name="description" content="Use o celular como monitor visual da tela do computador." />
+    <title>Monitor Visual Local</title>
+  </head>
+  <body>
+    <main id="app" class="app-shell" aria-live="polite">
+      <section class="panel hero-panel" id="hero-panel">
+        <p class="eyebrow">Monitor visual local</p>
+        <h1>Transforme um celular parado em um monitor da tela do computador</h1>
+        <p class="hero-copy">
+          A câmera traseira observa a tela do computador. Tudo acontece no próprio aparelho.
+        </p>
+        <div class="hero-actions">
+          <button id="prepare-button" class="primary-action">Preparar monitoramento</button>
+          <button id="hero-history-button" class="ghost-action">Histórico</button>
+        </div>
+        <p class="helper-text" id="compatibility-note">Mantenha a tela ligada e, se possível, deixe o celular no carregador.</p>
+      </section>
+
+      <section class="panel banner-panel" id="banner-panel" hidden aria-live="assertive">
+        <p id="banner-message"></p>
+      </section>
+
+      <section class="panel status-panel" id="status-panel" hidden>
+        <div class="status-head">
+          <span class="status-chip" id="mode-chip">idle</span>
+          <p class="status-text" id="status-text">Pronto para começar.</p>
+        </div>
+        <div class="status-grid">
+          <div class="status-metric">
+            <span>Última leitura</span>
+            <strong id="last-analysis-text">-</strong>
+          </div>
+          <div class="status-metric">
+            <span>Texto lido</span>
+            <pre id="last-recognized-text">-</pre>
+          </div>
+          <div class="status-metric">
+            <span>Confirmações</span>
+            <strong id="confirmation-count-text">0</strong>
+          </div>
+          <div class="status-metric">
+            <span>Rearme</span>
+            <strong id="clear-count-text">0</strong>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel camera-panel" id="camera-panel" hidden>
+        <header class="panel-header">
+          <div>
+            <p class="eyebrow">Câmera</p>
+            <h2>Região monitorada</h2>
+          </div>
+          <p class="helper-text" id="camera-resolution-text">Aguardando câmera.</p>
+        </header>
+
+        <div class="video-shell" id="video-frame">
+          <video id="camera-video" playsinline muted autoplay></video>
+          <div class="region-layer" id="region-overlay">
+            <div class="region-box" id="region-box">
+              <span class="region-label">Arraste para mover</span>
+              <button class="region-handle" id="region-resize-handle" aria-label="Redimensionar região"></button>
+            </div>
+          </div>
+        </div>
+
+        <div class="camera-actions">
+          <button id="capture-preview-button" class="secondary-action">Testar área</button>
+          <button id="pause-button" class="secondary-action">Pausar monitoramento</button>
+          <button id="resume-button" class="secondary-action" hidden>Retomar monitoramento</button>
+          <button id="stop-camera-button" class="ghost-action">Encerrar câmera</button>
+          <button id="history-toggle-button" class="ghost-action">Histórico</button>
+        </div>
+
+        <section class="panel-subsection preview-card">
+          <header class="subsection-header">
+            <div>
+              <h3>Prévia ampliada</h3>
+              <p class="helper-text">A leitura acontece só na área escolhida.</p>
+            </div>
+          </header>
+          <canvas id="preview-canvas" width="1" height="1"></canvas>
+        </section>
+      </section>
+
+      <section class="panel settings-panel" id="settings-panel" hidden>
+        <header class="panel-header">
+          <div>
+            <p class="eyebrow">Configuração</p>
+            <h2>Leitura e alerta</h2>
+          </div>
+        </header>
+
+        <div class="form-grid">
+          <label class="field field-wide">
+            <span>Texto principal esperado</span>
+            <input id="expected-text-input" type="text" placeholder="Ex.: Nova mensagem" />
+          </label>
+
+          <label class="field field-wide">
+            <span>Palavras-chave</span>
+            <textarea id="keywords-input" rows="3" placeholder="Ex.: urgente, erro, chamado"></textarea>
+            <small class="helper-text">Separe por vírgula, ponto e vírgula ou quebra de linha.</small>
+          </label>
+
+          <label class="field">
+            <span>Modo de comparação</span>
+            <select id="keyword-mode-select">
+              <option value="all">Todas as palavras-chave</option>
+              <option value="any">Qualquer palavra-chave</option>
+            </select>
+          </label>
+
+          <label class="field">
+            <span>Tempo entre leituras (ms)</span>
+            <input id="analysis-interval-input" type="number" min="500" step="250" />
+          </label>
+
+          <label class="field">
+            <span>Confirmações consecutivas</span>
+            <input id="required-confirmations-input" type="number" min="1" max="10" step="1" />
+          </label>
+
+          <label class="field">
+            <span>Análises sem correspondência para rearme</span>
+            <input id="clear-confirmations-input" type="number" min="1" max="10" step="1" />
+          </label>
+
+          <label class="field">
+            <span>Tempo mínimo entre alertas (ms)</span>
+            <input id="min-alert-interval-input" type="number" min="1000" step="500" />
+          </label>
+
+          <label class="field checkbox-field">
+            <span>Usar vibração</span>
+            <input id="vibration-toggle" type="checkbox" />
+          </label>
+
+          <label class="field checkbox-field">
+            <span>Usar som de alerta</span>
+            <input id="sound-toggle" type="checkbox" />
+          </label>
+
+          <label class="field checkbox-field field-wide">
+            <span>Salvar imagem do alerta no aparelho</span>
+            <input id="save-crops-toggle" type="checkbox" />
+          </label>
+        </div>
+
+        <section class="panel-subsection preprocess-card">
+          <header class="subsection-header">
+            <div>
+              <h3>Pré-processamento</h3>
+              <p class="helper-text">Use só se a leitura precisar melhorar.</p>
+            </div>
+          </header>
+
+          <div class="form-grid compact-grid">
+            <label class="field">
+              <span>Tamanho da leitura</span>
+              <select id="preprocess-scale-select">
+                <option value="1">1x</option>
+                <option value="2">2x</option>
+                <option value="3">3x</option>
+                <option value="4">4x</option>
+              </select>
+            </label>
+
+            <label class="field checkbox-field">
+              <span>Escala de cinza</span>
+              <input id="preprocess-grayscale-toggle" type="checkbox" />
+            </label>
+
+            <label class="field checkbox-field">
+              <span>Inverter cores</span>
+              <input id="preprocess-invert-toggle" type="checkbox" />
+            </label>
+
+            <label class="field field-wide">
+              <span>Contraste</span>
+              <input id="preprocess-threshold-input" type="range" min="0" max="255" step="1" />
+              <small class="helper-text">Valor atual: <strong id="preprocess-threshold-value">0</strong></small>
+            </label>
+          </div>
+        </section>
+
+        <div class="settings-actions">
+          <button id="test-alert-button" class="secondary-action">Testar alerta</button>
+          <button id="stop-test-alert-button" class="ghost-action" hidden>Parar teste</button>
+        </div>
+      </section>
+
+      <section class="panel history-panel" id="history-panel" hidden>
+        <header class="panel-header history-header">
+          <div>
+            <p class="eyebrow">Histórico</p>
+            <h2>Detecções locais</h2>
+          </div>
+          <div class="history-meta">
+            <strong id="history-total-count">0 detecções</strong>
+            <label class="field history-filter-field">
+              <span>Filtrar por data</span>
+              <input id="history-date-filter" type="date" />
+            </label>
+          </div>
+        </header>
+
+        <div class="history-actions">
+          <button id="clear-history-button" class="ghost-action danger-text">Limpar todo o histórico</button>
+        </div>
+
+        <div id="history-list" class="history-list"></div>
+      </section>
+
+      <section class="alert-overlay" id="alert-shell" hidden role="alertdialog" aria-modal="true" aria-labelledby="alert-title">
+        <div class="alert-card">
+          <p class="eyebrow">Notificação detectada</p>
+          <h2 id="alert-title">Alerta ativo</h2>
+          <p id="alert-time-text" class="alert-time"></p>
+          <button id="stop-alert-button" class="danger-action big-action">Parar alerta</button>
+        </div>
+      </section>
+    </main>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+  </html>
