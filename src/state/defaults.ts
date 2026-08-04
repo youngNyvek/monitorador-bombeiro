@@ -24,7 +24,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
 export function createInitialRuntimeState(): RuntimeState {
   return {
     mode: 'idle',
-    statusText: 'Pronto para preparar o monitoramento.',
+    statusText: 'Pronto.',
     pauseReason: null,
     originMode: null,
     analysisResumeAt: null,

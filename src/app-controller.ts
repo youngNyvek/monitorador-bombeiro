@@ -82,7 +82,6 @@ interface AppElements {
   heroPanel: HTMLElement;
   prepareButton: HTMLButtonElement;
   heroHistoryButton: HTMLButtonElement;
-  compatibilityNote: HTMLElement;
   bannerPanel: HTMLElement;
   bannerMessage: HTMLElement;
   statusPanel: HTMLElement;
@@ -180,7 +179,7 @@ export class AppController {
       this.state.settings = updateSettings(this.state.settings, { saveCropImages: false });
       this.state.banner = {
         tone: 'warning',
-        message: 'O aparelho não conseguiu salvar as imagens do alerta.',
+        message: 'Não salvou a imagem.',
       };
       this.persistSettings();
     }
@@ -199,7 +198,6 @@ export class AppController {
       heroPanel: this.getElement(root, '#hero-panel'),
       prepareButton: this.getElement(root, '#prepare-button'),
       heroHistoryButton: this.getElement(root, '#hero-history-button'),
-      compatibilityNote: this.getElement(root, '#compatibility-note'),
       bannerPanel: this.getElement(root, '#banner-panel'),
       bannerMessage: this.getElement(root, '#banner-message'),
       statusPanel: this.getElement(root, '#status-panel'),
@@ -395,21 +393,21 @@ export class AppController {
     if (!window.isSecureContext) {
       this.state.runtime = transitionRuntimeState(this.state.runtime, {
         type: 'error',
-        message: 'Abra a página em conexão segura para usar a câmera.',
+        message: 'Use HTTPS.',
       });
       this.state.banner = {
         tone: 'danger',
-        message: 'Abra a página em conexão segura para usar a câmera.',
+        message: 'Use HTTPS.',
       };
       this.canPrepare = false;
     } else if (!isCameraSupported()) {
       this.state.runtime = transitionRuntimeState(this.state.runtime, {
         type: 'error',
-        message: 'Este navegador não consegue abrir a câmera.',
+        message: 'Câmera indisponível.',
       });
       this.state.banner = {
         tone: 'danger',
-        message: 'Este navegador não consegue abrir a câmera.',
+        message: 'Câmera indisponível.',
       };
       this.canPrepare = false;
     }
@@ -421,7 +419,7 @@ export class AppController {
 
     if (this.state.settings.saveCropImages && !isIndexedDbSupported()) {
       this.state.settings = updateSettings(this.state.settings, { saveCropImages: false });
-      this.setBanner('O aparelho não conseguiu salvar as imagens do alerta.', 'warning');
+      this.setBanner('Não salvou a imagem.', 'warning');
     }
 
     this.persistSettings();
@@ -437,7 +435,7 @@ export class AppController {
     try {
       saveSettings(this.state.settings);
     } catch {
-      this.setBanner('Não foi possível salvar as configurações.', 'warning');
+      this.setBanner('Não salvou as configurações.', 'warning');
     }
   }
 
@@ -445,7 +443,7 @@ export class AppController {
     try {
       saveHistoryRecords(this.state.history);
     } catch {
-      this.setBanner('Não foi possível salvar o histórico. Verifique o espaço do aparelho.', 'warning');
+      this.setBanner('Não salvou o histórico.', 'warning');
     }
   }
 
@@ -484,7 +482,7 @@ export class AppController {
     this.elements.bannerPanel.dataset.tone = this.state.banner?.tone ?? '';
     this.elements.bannerMessage.textContent = this.state.banner?.message ?? '';
 
-    this.elements.prepareButton.textContent = mode === 'error' ? 'Tentar novamente' : 'Preparar câmera';
+      this.elements.prepareButton.textContent = mode === 'error' ? 'Tentar novamente' : 'Abrir câmera';
     this.elements.prepareButton.disabled = !this.canPrepare || mode === 'requesting-permission' || mode === 'preparing-camera' || mode === 'loading-ocr';
 
     const historyButtonLabel = this.state.historyOpen ? 'Fechar histórico' : 'Histórico';
@@ -518,14 +516,6 @@ export class AppController {
     this.syncSettingsForm();
     this.syncAlertPanel();
     this.syncHistoryPanel();
-
-    const noteParts = [
-      mode === 'ready-to-monitor'
-        ? 'Faça os dois testes abaixo antes de iniciar.'
-        : 'A câmera traseira observa a tela inteira e tudo acontece no aparelho.',
-      this.canPrepare ? 'Mantenha a tela ligada durante o uso.' : 'Abra a página em conexão segura para usar a câmera.',
-    ];
-    this.elements.compatibilityNote.textContent = noteParts.join(' ');
 
     if (this.state.historyOpen && !this.elements.historyPanel.hidden && this.state.history.length === 0) {
       this.historyDirty = true;
@@ -564,18 +554,18 @@ export class AppController {
       return;
     }
 
-    this.elements.alertTitle.textContent = 'Notificação detectada';
+    this.elements.alertTitle.textContent = 'Alerta';
     this.elements.alertTimeText.textContent = this.state.runtime.alertStartedAt
-      ? `Detectado em ${formatDateTimeDisplay(this.state.runtime.alertStartedAt)}`
-      : 'Alerta em andamento.';
+      ? formatDateTimeDisplay(this.state.runtime.alertStartedAt)
+      : '';
   }
 
   private syncHistoryPanel(): void {
     const totalCount = this.state.history.length;
     const visibleCount = this.getFilteredHistory().length;
     this.elements.historyTotalCount.textContent = totalCount === visibleCount
-      ? `${totalCount} detecções`
-      : `${visibleCount} de ${totalCount} detecções`;
+      ? String(totalCount)
+      : `${visibleCount}/${totalCount}`;
   }
 
   private syncAnalysisLoop(): void {
@@ -604,7 +594,7 @@ export class AppController {
 
   private async prepareMonitoring(): Promise<void> {
     if (!this.canPrepare) {
-      this.setBanner('Não foi possível usar a câmera neste aparelho.', 'warning');
+      this.setBanner('Câmera indisponível.', 'warning');
       return;
     }
 
@@ -659,14 +649,14 @@ export class AppController {
       try {
         await this.audio.prepare();
       } catch {
-        this.setBanner('O som do alerta pode não funcionar agora.', 'warning');
+        this.setBanner('Som indisponível.', 'warning');
       }
 
       const wakeLockResult = await this.wakeLock.request();
       if (!wakeLockResult.supported) {
-        this.setBanner('A tela pode desligar sozinha.', 'warning');
+        this.setBanner('Sem bloqueio de tela.', 'warning');
       } else if (!wakeLockResult.ok) {
-        this.setBanner('Não foi possível manter a tela ligada.', 'warning');
+        this.setBanner('Falha no bloqueio de tela.', 'warning');
       }
 
       await loadOcrWorker();
@@ -678,7 +668,7 @@ export class AppController {
       this.state.historyOpen = false;
       this.updateRuntime({ type: 'ocr-ready' });
       this.render();
-      this.setBanner('Faça a leitura e o alarme de teste antes de iniciar.', 'info', 4000);
+      this.setBanner('Teste.', 'info', 1500);
     } catch (error) {
       if (generation !== this.startupGeneration) {
         return;
@@ -690,7 +680,7 @@ export class AppController {
 
   private async startMonitoring(): Promise<void> {
     if (!this.canStartMonitoring()) {
-      this.setBanner('Faça os testes de leitura e alarme antes de iniciar.', 'warning');
+      this.setBanner('Teste.', 'warning');
       return;
     }
 
@@ -702,9 +692,9 @@ export class AppController {
 
     const wakeLockResult = await this.wakeLock.request();
     if (!wakeLockResult.supported) {
-      this.setBanner('A tela pode desligar sozinha.', 'warning');
+      this.setBanner('Sem bloqueio de tela.', 'warning');
     } else if (!wakeLockResult.ok) {
-      this.setBanner('Não foi possível manter a tela ligada.', 'warning');
+      this.setBanner('Falha no bloqueio de tela.', 'warning');
     }
 
     this.updateRuntime({
@@ -802,7 +792,7 @@ export class AppController {
         await saveCropBlob(recordId, blob);
         historyRecord.cropId = recordId;
       } catch {
-      this.setBanner('Não foi possível salvar a imagem do alerta.', 'warning');
+        this.setBanner('Não salvou a imagem.', 'warning');
         this.state.settings = updateSettings(this.state.settings, { saveCropImages: false });
         this.persistSettings();
       }
@@ -819,13 +809,13 @@ export class AppController {
       try {
         await this.audio.playTone();
       } catch {
-        this.setBanner('Não foi possível tocar o alerta.', 'warning');
+        this.setBanner('Alerta sem som.', 'warning');
       }
     }
 
     if (this.state.settings.vibrationEnabled) {
       if (!this.vibration.startLoop()) {
-        this.setBanner('A vibração não está disponível.', 'warning');
+        this.setBanner('Sem vibração.', 'warning');
       }
     }
 
@@ -892,7 +882,7 @@ export class AppController {
     }
 
     if (reason === 'background') {
-      this.setBanner('O monitoramento foi pausado porque a aba ficou em segundo plano.', 'warning');
+      this.setBanner('Pausado pela aba.', 'warning');
     }
   }
 
@@ -902,16 +892,16 @@ export class AppController {
     }
 
     if (!this.stream) {
-      this.setBanner('A câmera não está disponível. Prepare de novo.', 'warning');
+      this.setBanner('Câmera indisponível.', 'warning');
       return;
     }
 
     this.cancelAnalysisLoop();
     const wakeLockResult = await this.wakeLock.request();
     if (!wakeLockResult.supported) {
-      this.setBanner('Não foi possível manter a tela ligada.', 'warning');
+      this.setBanner('Falha no bloqueio de tela.', 'warning');
     } else if (!wakeLockResult.ok) {
-      this.setBanner('Não foi possível manter a tela ligada.', 'warning');
+      this.setBanner('Falha no bloqueio de tela.', 'warning');
     }
 
     this.updateRuntime({
@@ -943,7 +933,7 @@ export class AppController {
 
     this.updateRuntime({ type: 'camera-stopped' });
     this.render();
-    this.setBanner('A câmera foi encerrada.', 'info');
+    this.setBanner('Câmera encerrada.', 'info');
   }
 
   private stopCameraResources(): void {
@@ -1007,7 +997,7 @@ export class AppController {
     this.stopCameraResources();
     this.updateRuntime({ type: 'camera-stopped' });
     this.render();
-    this.setBanner('A câmera foi interrompida. Toque em "Preparar monitoramento" para tentar novamente.', 'warning');
+    this.setBanner('Câmera interrompida.', 'warning');
   }
 
   private async handleFatalError(message: string): Promise<void> {
@@ -1041,8 +1031,8 @@ export class AppController {
 
   private async handleAnalysisFailure(error: unknown): Promise<void> {
     const message = error instanceof Error && error.message.includes('video-not-ready')
-      ? 'A câmera ainda não está pronta.'
-      : 'Não foi possível ler a imagem da câmera. O monitoramento será encerrado.';
+      ? 'Câmera não pronta.'
+      : 'Leitura falhou.';
 
     await this.handleFatalError(message);
   }
@@ -1056,10 +1046,10 @@ export class AppController {
       await this.audio.playTestTone();
       this.testAlertActive = true;
       this.state.preflightChecks.alertTested = true;
-      this.setBanner('Teste de alerta tocando. Toque em "Parar teste" quando quiser.', 'info');
+      this.setBanner('Teste tocando.', 'info');
       this.render();
     } catch {
-      this.setBanner('Não foi possível tocar o teste.', 'warning');
+      this.setBanner('Teste falhou.', 'warning');
     }
   }
 
@@ -1071,12 +1061,12 @@ export class AppController {
     this.audio.stopTone();
     this.testAlertActive = false;
     this.render();
-    this.setBanner('Teste de alerta interrompido.', 'info', 2500);
+    this.setBanner('Teste parado.', 'info', 1500);
   }
 
   private async capturePreview(): Promise<void> {
     if (!this.stream) {
-      this.setBanner('A câmera ainda não está pronta.', 'warning');
+      this.setBanner('Câmera não pronta.', 'warning');
       return;
     }
 
@@ -1086,9 +1076,9 @@ export class AppController {
       this.previewContext.clearRect(0, 0, this.elements.previewCanvas.width, this.elements.previewCanvas.height);
       this.previewContext.drawImage(canvas, 0, 0);
       this.state.preflightChecks.previewTested = true;
-      this.setBanner('Prévia atualizada.', 'info', 2500);
+      this.setBanner('Prévia ok.', 'info', 1500);
     } catch {
-      this.setBanner('Não foi possível testar a imagem da câmera.', 'warning');
+      this.setBanner('Teste falhou.', 'warning');
     }
   }
 
@@ -1121,7 +1111,7 @@ export class AppController {
     }
 
     this.render();
-      this.setBanner('Histórico limpo.', 'info', 2500);
+      this.setBanner('Histórico limpo.', 'info', 1500);
   }
 
   private async handleVisibilityChange(): Promise<void> {
@@ -1138,13 +1128,13 @@ export class AppController {
     }
 
     if (this.state.runtime.mode === 'paused' && this.state.runtime.pauseReason === 'background') {
-      this.setBanner('A aba voltou. Toque em "Retomar monitoramento" para continuar.', 'warning');
+      this.setBanner('Aba voltou. Retome.', 'warning');
     }
 
     if (this.isAnalyzableMode(this.state.runtime.mode)) {
       const wakeLockResult = await this.wakeLock.request();
       if (!wakeLockResult.ok && wakeLockResult.supported) {
-      this.setBanner('Não foi possível manter a tela ligada.', 'warning');
+        this.setBanner('Falha no bloqueio de tela.', 'warning');
       }
     }
   }
@@ -1190,7 +1180,7 @@ export class AppController {
     }
 
     if (this.state.runtime.mode === 'ready-to-monitor') {
-      return this.cameraResolution ? `Câmera pronta • ${this.cameraResolution.width}×${this.cameraResolution.height}` : 'Pronta para iniciar.';
+      return this.cameraResolution ? `Câmera pronta • ${this.cameraResolution.width}×${this.cameraResolution.height}` : 'Pronta.';
     }
 
     if (this.state.runtime.mode === 'requesting-permission') {
@@ -1198,7 +1188,7 @@ export class AppController {
     }
 
     if (this.state.runtime.mode === 'preparing-camera') {
-      return 'Preparando a câmera...';
+      return 'Preparando...';
     }
 
     if (this.state.runtime.mode === 'camera-ready') {
@@ -1268,8 +1258,8 @@ export class AppController {
       const empty = document.createElement('div');
       empty.className = 'history-empty';
       empty.textContent = this.state.historyFilterDate
-        ? 'Nenhuma detecção encontrada para a data selecionada.'
-        : 'Nenhuma detecção registrada ainda.';
+        ? 'Sem registros.'
+        : 'Vazio.';
       this.elements.historyList.append(empty);
       this.historyDirty = false;
       return;
@@ -1378,7 +1368,7 @@ export class AppController {
     try {
       const blob = await getCropBlob(record.cropId);
       if (!blob) {
-        imageSlot.textContent = 'Imagem não encontrada.';
+        imageSlot.textContent = 'Imagem ausente.';
         return;
       }
 
@@ -1391,7 +1381,7 @@ export class AppController {
       image.src = url;
       imageSlot.replaceChildren(image);
     } catch {
-      imageSlot.textContent = 'Não foi possível carregar a imagem salva.';
+      imageSlot.textContent = 'Imagem falhou.';
     }
   }
 
@@ -1475,29 +1465,29 @@ function modeLabel(mode: AppMode): string {
     case 'idle':
       return 'Pronto';
     case 'requesting-permission':
-      return 'Pedindo acesso';
+      return 'Pedindo';
     case 'preparing-camera':
-      return 'Preparando câmera';
+      return 'Preparando';
     case 'camera-ready':
-      return 'Câmera pronta';
+      return 'Pronta';
     case 'loading-ocr':
-      return 'Carregando leitura';
+      return 'OCR';
     case 'ready-to-monitor':
-      return 'Pré-teste';
+      return 'Teste';
     case 'monitoring':
       return 'Monitorando';
     case 'analyzing':
-      return 'Analisando';
+      return 'Lendo';
     case 'candidate-detected':
       return 'Confirmando';
     case 'alerting':
-      return 'Alerta ligado';
+      return 'Alerta';
     case 'waiting-for-clear':
-      return 'Aguardando sumir';
+      return 'Aguardando';
     case 'paused':
       return 'Pausado';
     case 'camera-stopped':
-      return 'Câmera parada';
+      return 'Encerrada';
     case 'error':
       return 'Erro';
     default:
@@ -1508,15 +1498,15 @@ function modeLabel(mode: AppMode): string {
 function labelForFinalState(finalState: HistoryFinalState): string {
   switch (finalState) {
     case 'alerting':
-      return 'Alerta ligado';
+      return 'Alerta';
     case 'waiting-for-clear':
-      return 'Aguardando sumir';
+      return 'Aguardando';
     case 'monitoring':
       return 'Monitorando';
     case 'paused':
       return 'Pausado';
     case 'camera-stopped':
-      return 'Câmera parada';
+      return 'Encerrada';
     case 'error':
       return 'Erro';
     default:
@@ -1562,33 +1552,33 @@ function describeSetupError(error: unknown): string {
   if (error instanceof DOMException) {
     switch (error.name) {
       case 'NotAllowedError':
-        return 'Acesso à câmera negado. Autorize e tente de novo.';
+        return 'Câmera negada.';
       case 'NotFoundError':
-        return 'Nenhuma câmera foi encontrada.';
+        return 'Nenhuma câmera.';
       case 'NotReadableError':
-        return 'A câmera está indisponível ou em uso.';
+        return 'Câmera em uso.';
       case 'SecurityError':
-        return 'Abra a página em conexão segura para usar a câmera.';
+        return 'Use HTTPS.';
       case 'AbortError':
-        return 'A câmera foi interrompida.';
+        return 'Câmera interrompida.';
       case 'OverconstrainedError':
-        return 'A câmera não pôde ser iniciada.';
+        return 'Câmera não iniciou.';
       default:
-        return 'Não foi possível abrir a câmera.';
+        return 'Erro na câmera.';
     }
   }
 
   if (error instanceof Error) {
     if (error.message === 'camera-unsupported') {
-      return 'Este aparelho não consegue abrir a câmera.';
+      return 'Câmera indisponível.';
     }
 
     if (error.message === 'video-play-failed') {
-      return 'Não foi possível iniciar a câmera.';
+      return 'Câmera não iniciou.';
     }
 
-    return `Não foi possível preparar o monitoramento: ${error.message}`;
+    return `Erro: ${error.message}`;
   }
 
-  return 'Não foi possível preparar o monitoramento.';
+  return 'Erro na câmera.';
 }

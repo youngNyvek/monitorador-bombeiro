@@ -11,15 +11,11 @@
     <main id="app" class="app-shell" aria-live="polite">
       <section class="panel hero-panel" id="hero-panel">
         <p class="eyebrow">Monitor visual local</p>
-        <h1>Transforme um celular parado em um monitor da tela do computador</h1>
-        <p class="hero-copy">
-          A câmera traseira observa a tela inteira do computador. Tudo acontece no próprio aparelho.
-        </p>
+        <h1>Câmera como monitor</h1>
         <div class="hero-actions">
-          <button id="prepare-button" class="primary-action">Preparar monitoramento</button>
+          <button id="prepare-button" class="primary-action">Abrir câmera</button>
           <button id="hero-history-button" class="ghost-action">Histórico</button>
         </div>
-        <p class="helper-text" id="compatibility-note">Mantenha a tela ligada e, depois de abrir a câmera, teste a leitura e o alarme antes de iniciar.</p>
       </section>
 
       <section class="panel banner-panel" id="banner-panel" hidden aria-live="assertive">
@@ -30,9 +26,9 @@
         <header class="panel-header">
           <div>
             <p class="eyebrow">Câmera</p>
-            <h2>Câmera inteira</h2>
+            <h2>Câmera</h2>
           </div>
-          <p class="helper-text" id="camera-resolution-text">Aguardando câmera.</p>
+          <p class="helper-text" id="camera-resolution-text">Aguardando.</p>
         </header>
 
         <div class="video-shell" id="video-frame">
@@ -42,8 +38,7 @@
         <section class="panel-subsection preflight-card" id="preflight-panel" hidden>
           <header class="subsection-header">
             <div>
-              <h3>Teste antes de iniciar</h3>
-              <p class="helper-text">Faça a leitura e o alarme manualmente. O monitoramento só começa depois.</p>
+              <h3>Teste</h3>
             </div>
           </header>
 
@@ -53,18 +48,17 @@
           </div>
 
           <div class="preflight-actions">
-            <button id="capture-preview-button" class="secondary-action">Testar leitura</button>
-            <button id="test-alert-button" class="secondary-action">Testar alarme</button>
+            <button id="capture-preview-button" class="secondary-action">Leitura</button>
+            <button id="test-alert-button" class="secondary-action">Alarme</button>
           </div>
 
-          <button id="stop-test-alert-button" class="ghost-action preflight-stop" hidden>Parar teste</button>
-          <button id="start-monitoring-button" class="primary-action big-action" disabled>Iniciar monitoramento</button>
+          <button id="stop-test-alert-button" class="ghost-action preflight-stop" hidden>Parar</button>
+          <button id="start-monitoring-button" class="primary-action big-action" disabled>Iniciar</button>
 
           <section class="panel-subsection preview-card">
             <header class="subsection-header">
               <div>
-                <h3>Prévia da leitura</h3>
-                <p class="helper-text">É assim que a câmera está sendo lida.</p>
+                <h3>Prévia</h3>
               </div>
             </header>
             <canvas id="preview-canvas" width="1" height="1"></canvas>
@@ -84,8 +78,8 @@
           <div class="status-summary-main">
             <span class="status-chip" id="mode-chip">idle</span>
             <div>
-              <p class="status-title">Log do OCR</p>
-              <p class="status-text" id="status-text">Pronto para começar.</p>
+            <p class="status-title">OCR</p>
+            <p class="status-text" id="status-text">Pronto.</p>
             </div>
           </div>
           <span class="status-summary-hint">Abrir</span>
@@ -118,68 +112,60 @@
           <div>
             <p class="eyebrow">Configuração</p>
             <h2>Leitura e alertas</h2>
-            <p class="helper-text">Diga ao celular o que procurar na tela e como ele deve avisar.</p>
           </div>
         </header>
 
         <div class="form-grid">
           <label class="field field-wide">
-            <span>Texto principal que deve aparecer</span>
-            <input id="expected-text-input" type="text" placeholder="Ex.: Nova mensagem" />
-            <small class="helper-text">Escreva a frase principal que costuma aparecer na tela.</small>
+            <span>Texto principal</span>
+            <input id="expected-text-input" type="text" />
           </label>
 
           <label class="field field-wide">
-            <span>Palavras de apoio</span>
-            <textarea id="keywords-input" rows="3" placeholder="Ex.: urgente, erro, chamado"></textarea>
-            <small class="helper-text">Use palavras que ajudam a reconhecer o aviso. Separe por vírgula, ponto e vírgula ou linha.</small>
+            <span>Palavras-chave</span>
+            <textarea id="keywords-input" rows="3"></textarea>
           </label>
 
           <label class="field">
-            <span>Como usar as palavras de apoio</span>
+            <span>Modo</span>
             <select id="keyword-mode-select">
               <option value="all">Todas as palavras</option>
               <option value="any">Basta uma palavra</option>
             </select>
-            <small class="helper-text">Escolha se o alerta precisa de todas as palavras ou só de uma delas.</small>
           </label>
 
           <label class="field">
-            <span>Intervalo entre checagens (ms)</span>
+            <span>Intervalo (ms)</span>
             <input id="analysis-interval-input" type="number" min="500" step="250" />
-            <small class="helper-text">Menor valor responde mais rápido. Maior valor economiza bateria.</small>
           </label>
 
           <label class="field">
-            <span>Quantas leituras iguais antes do alerta</span>
+            <span>Confirmações</span>
             <input id="required-confirmations-input" type="number" min="1" max="10" step="1" />
-            <small class="helper-text">Evita alarmes por engano, pedindo a mesma leitura mais de uma vez.</small>
           </label>
 
           <label class="field">
-            <span>Quantas leituras sem aviso para voltar ao normal</span>
+            <span>Rearme</span>
             <input id="clear-confirmations-input" type="number" min="1" max="10" step="1" />
-            <small class="helper-text">Depois que o alerta parar, o aparelho espera esse número de leituras sem o texto para liberar de novo.</small>
           </label>
 
           <label class="field">
-            <span>Espera mínima entre dois alertas (ms)</span>
+            <span>Entre alertas (ms)</span>
             <input id="min-alert-interval-input" type="number" min="1000" step="500" />
-            <small class="helper-text">Impede que o mesmo aviso toque sem parar.</small>
           </label>
 
           <label class="field checkbox-field">
-            <span>Vibrar junto com o alerta</span>
+            <span>Vibração</span>
             <input id="vibration-toggle" type="checkbox" />
           </label>
 
           <label class="field checkbox-field">
-            <span>Tocar som junto com o alerta</span>
+            <span>Som</span>
             <input id="sound-toggle" type="checkbox" />
           </label>
 
           <label class="field checkbox-field field-wide">
-            <span>Salvar imagem do alerta no aparelho</span>
+            <span>Salvar imagem</span>
             <input id="save-crops-toggle" type="checkbox" />
           </label>
         </div>
@@ -188,36 +174,34 @@
           <header class="subsection-header">
             <div>
               <h3>Pré-processamento</h3>
-              <p class="helper-text">Use só se o texto estiver difícil de ler.</p>
             </div>
           </header>
 
           <div class="form-grid compact-grid">
             <label class="field">
-              <span>Aumentar o texto antes de ler</span>
+              <span>Escala</span>
               <select id="preprocess-scale-select">
                 <option value="1">1x</option>
                 <option value="2">2x</option>
                 <option value="3">3x</option>
                 <option value="4">4x</option>
               </select>
-              <small class="helper-text">Pode ajudar quando as letras estiverem pequenas.</small>
             </label>
 
             <label class="field checkbox-field">
-              <span>Tirar as cores</span>
+              <span>Sem cor</span>
               <input id="preprocess-grayscale-toggle" type="checkbox" />
             </label>
 
             <label class="field checkbox-field">
-              <span>Trocar claro por escuro</span>
+              <span>Inverter</span>
               <input id="preprocess-invert-toggle" type="checkbox" />
             </label>
 
             <label class="field field-wide">
-              <span>Aumentar o contraste</span>
+              <span>Contraste</span>
               <input id="preprocess-threshold-input" type="range" min="0" max="255" step="1" />
-              <small class="helper-text">Deixa letras fracas mais visíveis. Valor atual: <strong id="preprocess-threshold-value">0</strong></small>
+              <small class="helper-text"><strong id="preprocess-threshold-value">0</strong></small>
             </label>
           </div>
         </section>
@@ -227,19 +211,19 @@
         <header class="panel-header history-header">
           <div>
             <p class="eyebrow">Histórico</p>
-            <h2>Detecções locais</h2>
+            <h2>Histórico</h2>
           </div>
           <div class="history-meta">
-            <strong id="history-total-count">0 detecções</strong>
+            <strong id="history-total-count">0</strong>
             <label class="field history-filter-field">
-              <span>Filtrar por data</span>
+              <span>Data</span>
               <input id="history-date-filter" type="date" />
             </label>
           </div>
         </header>
 
         <div class="history-actions">
-          <button id="clear-history-button" class="ghost-action danger-text">Limpar todo o histórico</button>
+          <button id="clear-history-button" class="ghost-action danger-text">Limpar</button>
         </div>
 
         <div id="history-list" class="history-list"></div>
@@ -247,10 +231,10 @@
 
       <section class="alert-overlay" id="alert-shell" hidden role="alertdialog" aria-modal="true" aria-labelledby="alert-title">
         <div class="alert-card">
-          <p class="eyebrow">Notificação detectada</p>
-          <h2 id="alert-title">Alerta ativo</h2>
+          <p class="eyebrow">Alerta</p>
+          <h2 id="alert-title">Alerta</h2>
           <p id="alert-time-text" class="alert-time"></p>
-          <button id="stop-alert-button" class="danger-action big-action">Parar alerta</button>
+          <button id="stop-alert-button" class="danger-action big-action">Parar</button>
         </div>
       </section>
     </main>

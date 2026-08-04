@@ -32,7 +32,7 @@ export function transitionRuntimeState(state: RuntimeState, event: RuntimeEvent)
       return {
         ...state,
         mode: 'requesting-permission',
-        statusText: 'Solicitando acesso à câmera traseira...',
+        statusText: 'Pedindo câmera...',
         pauseReason: null,
         originMode: null,
         analysisResumeAt: null,
@@ -43,7 +43,7 @@ export function transitionRuntimeState(state: RuntimeState, event: RuntimeEvent)
       return {
         ...state,
         mode: 'preparing-camera',
-        statusText: 'Preparando a câmera...',
+        statusText: 'Preparando...',
         originMode: null,
         analysisResumeAt: null,
       };
@@ -51,7 +51,7 @@ export function transitionRuntimeState(state: RuntimeState, event: RuntimeEvent)
       return {
         ...state,
         mode: 'camera-ready',
-        statusText: 'Câmera pronta. Carregando OCR local...',
+        statusText: 'OCR carregando...',
         analysisResumeAt: null,
         originMode: null,
       };
@@ -59,7 +59,7 @@ export function transitionRuntimeState(state: RuntimeState, event: RuntimeEvent)
       return {
         ...state,
         mode: 'loading-ocr',
-        statusText: 'Carregando OCR local...',
+        statusText: 'Carregando OCR...',
         analysisResumeAt: null,
         originMode: null,
       };
@@ -67,7 +67,7 @@ export function transitionRuntimeState(state: RuntimeState, event: RuntimeEvent)
       return {
         ...state,
         mode: 'ready-to-monitor',
-        statusText: 'Faça os testes e inicie o monitoramento.',
+        statusText: 'Teste e inicie.',
         analysisResumeAt: null,
         originMode: null,
         confirmationCount: 0,
@@ -91,7 +91,7 @@ export function transitionRuntimeState(state: RuntimeState, event: RuntimeEvent)
       return {
         ...state,
         mode: 'analyzing',
-        statusText: 'Lendo a imagem inteira da câmera...',
+        statusText: 'Lendo...',
         originMode: state.mode,
         analysisResumeAt: null,
       };
@@ -109,7 +109,7 @@ export function transitionRuntimeState(state: RuntimeState, event: RuntimeEvent)
           return {
             ...state,
             mode: 'waiting-for-clear',
-            statusText: `Aguardando sumir (${state.clearCount}/${event.clearConfirmations})`,
+            statusText: `Aguardando (${state.clearCount}/${event.clearConfirmations})`,
             originMode: null,
             analysisResumeAt: event.now + Math.max(0, event.analysisIntervalMs),
             lastAnalysisAt: analyzedAt,
@@ -123,7 +123,7 @@ export function transitionRuntimeState(state: RuntimeState, event: RuntimeEvent)
           return {
             ...state,
             mode: 'monitoring',
-            statusText: 'Sumiu. Voltando a monitorar.',
+            statusText: 'Voltou.',
             originMode: null,
             analysisResumeAt: event.now + Math.max(0, event.analysisIntervalMs),
             lastAnalysisAt: analyzedAt,
@@ -139,7 +139,7 @@ export function transitionRuntimeState(state: RuntimeState, event: RuntimeEvent)
         return {
           ...state,
           mode: 'waiting-for-clear',
-          statusText: `Aguardando sumir (${nextClearCount}/${event.clearConfirmations})`,
+          statusText: `Aguardando (${nextClearCount}/${event.clearConfirmations})`,
           originMode: null,
           analysisResumeAt: event.now + Math.max(0, event.analysisIntervalMs),
           lastAnalysisAt: analyzedAt,
@@ -160,7 +160,7 @@ export function transitionRuntimeState(state: RuntimeState, event: RuntimeEvent)
           return {
             ...state,
             mode: 'alerting',
-            statusText: 'Alerta ligado.',
+            statusText: 'Alerta.',
             originMode: null,
             analysisResumeAt: null,
             lastAnalysisAt: analyzedAt,
@@ -176,8 +176,8 @@ export function transitionRuntimeState(state: RuntimeState, event: RuntimeEvent)
           mode: 'candidate-detected',
           statusText:
             nextConfirmationCount >= event.requiredConfirmations
-            ? 'Encontrado. Aguardando liberar...'
-              : `Confirmando (${nextConfirmationCount}/${event.requiredConfirmations}).`,
+            ? 'Esperando liberar...'
+              : `Confirmando (${nextConfirmationCount}/${event.requiredConfirmations})`,
           originMode: null,
           analysisResumeAt: event.now + Math.max(0, event.analysisIntervalMs),
           lastAnalysisAt: analyzedAt,
@@ -190,7 +190,7 @@ export function transitionRuntimeState(state: RuntimeState, event: RuntimeEvent)
       return {
         ...state,
         mode: 'monitoring',
-        statusText: 'Monitorando.',
+        statusText: 'Monitorando',
         originMode: null,
         analysisResumeAt: event.now + Math.max(0, event.analysisIntervalMs),
         lastAnalysisAt: analyzedAt,
@@ -207,10 +207,10 @@ export function transitionRuntimeState(state: RuntimeState, event: RuntimeEvent)
       const alertStartedAtMs = state.alertStartedAt ? Date.parse(state.alertStartedAt) : NaN;
       const durationMs = Number.isFinite(alertStartedAtMs) ? Math.max(0, event.now - alertStartedAtMs) : null;
 
-      return {
-        ...state,
-        mode: 'waiting-for-clear',
-        statusText: 'Aguardando sumir.',
+        return {
+          ...state,
+          mode: 'waiting-for-clear',
+          statusText: 'Aguardando.',
         pauseReason: null,
         originMode: null,
         analysisResumeAt: event.now + Math.max(0, event.recoveryMs),
@@ -239,12 +239,12 @@ export function transitionRuntimeState(state: RuntimeState, event: RuntimeEvent)
           state.mode === 'alerting' || state.mode === 'waiting-for-clear' || state.mode === 'analyzing';
 
         return {
-          ...state,
-          mode: 'paused',
-          statusText:
-            event.reason === 'background'
-              ? 'Monitoramento pausado pela aba em segundo plano.'
-              : 'Monitoramento pausado.',
+        ...state,
+        mode: 'paused',
+        statusText:
+          event.reason === 'background'
+            ? 'Pausado pela aba.'
+            : 'Pausado',
           pauseReason: event.reason ?? 'manual',
           originMode: null,
           analysisResumeAt: null,
@@ -260,7 +260,7 @@ export function transitionRuntimeState(state: RuntimeState, event: RuntimeEvent)
       return {
         ...state,
         mode: 'camera-stopped',
-        statusText: 'Câmera encerrada.',
+        statusText: 'Câmera encerrada',
         pauseReason: null,
         originMode: null,
         analysisResumeAt: null,
