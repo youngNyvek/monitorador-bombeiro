@@ -15,6 +15,7 @@ export function parseKeywordsInput(value: string): string[] {
   return value
     .split(/[\n,;]+/)
     .map((keyword) => keyword.trim())
+    .map((keyword) => normalizeTextForComparison(keyword))
     .filter(Boolean)
     .filter((keyword, index, array) => array.indexOf(keyword) === index);
 }
@@ -25,7 +26,10 @@ export function compareRecognitionText(
 ): DetectionComparisonResult {
   const normalizedText = normalizeTextForComparison(recognizedText);
   const normalizedExpectedText = normalizeTextForComparison(config.expectedText);
-  const normalizedKeywords = config.keywords.map((keyword) => ({ raw: keyword, normalized: normalizeTextForComparison(keyword) })).filter((item) => item.normalized.length > 0);
+  const normalizedKeywords = config.keywords
+    .map((keyword) => normalizeTextForComparison(keyword))
+    .filter(Boolean)
+    .filter((keyword, index, array) => array.indexOf(keyword) === index);
 
   const hasCriteria = normalizedExpectedText.length > 0 || normalizedKeywords.length > 0;
   if (!hasCriteria) {
@@ -42,13 +46,9 @@ export function compareRecognitionText(
   const mainTextMatched =
     normalizedExpectedText.length === 0 || normalizedText.includes(normalizedExpectedText);
 
-  const matchedKeywords = normalizedKeywords
-    .filter((keyword) => normalizedText.includes(keyword.normalized))
-    .map((keyword) => keyword.raw);
+  const matchedKeywords = normalizedKeywords.filter((keyword) => normalizedText.includes(keyword));
 
-  const missingKeywords = normalizedKeywords
-    .filter((keyword) => !normalizedText.includes(keyword.normalized))
-    .map((keyword) => keyword.raw);
+  const missingKeywords = normalizedKeywords.filter((keyword) => !normalizedText.includes(keyword));
 
   const keywordsMatched =
     normalizedKeywords.length === 0

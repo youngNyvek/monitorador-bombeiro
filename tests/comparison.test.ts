@@ -7,7 +7,7 @@ describe('text comparison', () => {
   });
 
   it('parses keyword lists from commas, semicolons and new lines', () => {
-    expect(parseKeywordsInput('um, dois; três\nquatro')).toEqual(['um', 'dois', 'três', 'quatro']);
+    expect(parseKeywordsInput('um, dois; três\nquatro')).toEqual(['um', 'dois', 'tres', 'quatro']);
   });
 
   it('matches when all configured keywords are present', () => {
